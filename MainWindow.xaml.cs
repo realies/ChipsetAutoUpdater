@@ -52,8 +52,11 @@ namespace ChipsetAutoUpdater
                 if (this.detectedChipset != null)
                 {
                     this.latestVersionUrl = await this.FetchLatestVersionUrl(this.detectedChipset);
-                    this.latestVersion = this.latestVersionUrl.Split('_').Last().Replace(".exe", string.Empty);
-                    this.InstallDriversButton.IsEnabled = true;
+                    this.latestVersion = this.latestVersionUrl?.Split('_').Last().Replace(".exe", string.Empty);
+                    if (this.latestVersion != null)
+                    {
+                        this.InstallDriversButton.IsEnabled = true;
+                    }
                 }
 
                 this.LatestVersionText.Text = this.latestVersion ?? "Error fetching";
@@ -129,12 +132,12 @@ namespace ChipsetAutoUpdater
             {
                 string driversPageUrl = "https://www.amd.com/en/support/download/drivers.html";
                 string driversPageContent = await this.client.GetStringAsync(driversPageUrl);
-                string driversPagePattern = $@"https://[^\s""']*{Regex.Escape(chipset)}\.html";
+                string driversPagePattern = $@"https://[^""&]+{Regex.Escape(chipset)}\.html";
                 Match driversUrlMatch = Regex.Match(driversPageContent, driversPagePattern, RegexOptions.IgnoreCase);
                 if (driversUrlMatch.Success)
                 {
                     string chipsetPageContent = await this.client.GetStringAsync(driversUrlMatch.Value);
-                    string chipsetUrlPattern = $@"https://[^\s""']*.exe";
+                    string chipsetUrlPattern = $@"https://[^""]+\.exe";
                     Match chipsetUrlMatch = Regex.Match(chipsetPageContent, chipsetUrlPattern, RegexOptions.IgnoreCase);
                     if (chipsetUrlMatch.Success)
                     {
