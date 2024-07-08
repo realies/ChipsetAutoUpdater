@@ -1,0 +1,39 @@
+﻿<Window x:Class="ChipsetAutoUpdater.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ChipsetAutoUpdater"
+        mc:Ignorable="d"
+        Title=""
+        Height="146"
+        Width="256"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="128" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="Bold">Chipset Detected:</TextBlock>
+        <TextBlock Grid.Row="0" Grid.Column="1" Name="ChipsetModelText">Fetching chipset...</TextBlock>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="Bold">Currently Installed:</TextBlock>
+        <TextBlock Grid.Row="1" Grid.Column="1" Name="InstalledVersionText">Fetching version...</TextBlock>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="Bold">Latest Version:</TextBlock>
+        <TextBlock Grid.Row="2" Grid.Column="1" Name="LatestVersionText">Fetching version...</TextBlock>
+
+        <ProgressBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DownloadProgressBar" Height="8" Margin="0 6 0 6" Minimum="0" Maximum="100" Visibility="Visible"/>
+        <Button Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Content="Install Drivers" Click="InstallDrivers_Click" Name="InstallDriversButton" IsEnabled="False"/>
+        <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Content="Cancel Download" Click="CancelDownload_Click" Name="CancelButton" Visibility="Collapsed"/>
+    </Grid>
+</Window>

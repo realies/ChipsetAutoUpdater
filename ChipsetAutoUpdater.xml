@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ChipsetAutoUpdater</name>
+    </assembly>
+    <members>
+        <member name="T:ChipsetAutoUpdater.App">
+            <summary>
+            Interaction logic for App.xaml.
+            </summary>
+            <summary>
+            App
+            </summary>
+        </member>
+        <member name="M:ChipsetAutoUpdater.App.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+        <member name="M:ChipsetAutoUpdater.App.Main">
+            <summary>
+            Application Entry Point.
+            </summary>
+        </member>
+        <member name="T:ChipsetAutoUpdater.MainWindow">
+            <summary>
+            Interaction logic for MainWindow.xaml.
+            </summary>
+            <summary>
+            MainWindow
+            </summary>
+        </member>
+        <member name="M:ChipsetAutoUpdater.MainWindow.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:ChipsetAutoUpdater.MainWindow"/> class.
+            </summary>
+        </member>
+        <member name="M:ChipsetAutoUpdater.MainWindow.ChipsetModelMatcher">
+            <summary>
+            Attempt to match AM4 or AM5 model name via a registry entry.
+            </summary>
+            <returns>A capitalised chipset name or null.</returns>
+        </member>
+        <member name="M:ChipsetAutoUpdater.MainWindow.GetInstalledAMDChipsetVersion">
+            <summary>
+            Attempt to read the currently installed AMD Chipset Software version.
+            </summary>
+            <returns>A currently installed package version or null.</returns>
+        </member>
+        <member name="M:ChipsetAutoUpdater.MainWindow.FetchLatestVersionUrl(System.String)">
+            <summary>
+            Attempt to fetch the latest release version URL for AMD Chipset Software.
+            </summary>
+            <param name="chipset">Target chipset to check.</param>
+            <returns>The latest release version or null.</returns>
+        </member>
+        <member name="M:ChipsetAutoUpdater.MainWindow.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+        <member name="T:ChipsetAutoUpdater.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:ChipsetAutoUpdater.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:ChipsetAutoUpdater.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+    </members>
+</doc>
