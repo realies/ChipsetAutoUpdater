@@ -47,9 +47,9 @@
             </summary>
             <returns>A currently installed package version or null.</returns>
         </member>
-        <member name="M:ChipsetAutoUpdater.MainWindow.FetchLatestVersionUrl(System.String)">
+        <member name="M:ChipsetAutoUpdater.MainWindow.FetchLatestVersionData(System.String)">
             <summary>
-            Attempt to fetch the latest release version URL for AMD Chipset Software.
+            Attempt to fetch the latest release page and executable download URL, and parse the latest version for AMD Chipset Software.
             </summary>
             <param name="chipset">Target chipset to check.</param>
             <returns>The latest release version or null.</returns>

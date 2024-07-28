@@ -15,6 +15,7 @@ namespace ChipsetAutoUpdater
     using System.Threading;
     using System.Threading.Tasks;
     using System.Windows;
+    using System.Windows.Input;
     using Microsoft.Win32;
 
     /// <summary>
@@ -22,10 +23,12 @@ namespace ChipsetAutoUpdater
     /// </summary>
     public partial class MainWindow : Window
     {
-        private string detectedChipset;
-        private string installedVersion;
-        private string latestVersionUrl;
-        private string latestVersion;
+        private string detectedChipsetString;
+        private string installedVersionString;
+        private string latestVersionReleasePageUrl;
+        private string latestVersionDownloadFileUrl;
+        private string latestVersionString;
+
         private CancellationTokenSource cancellationTokenSource;
         private HttpClient client = new HttpClient();
 
@@ -45,21 +48,43 @@ namespace ChipsetAutoUpdater
                 this.client.DefaultRequestHeaders.Referrer = new Uri("https://www.amd.com/");
                 this.client.Timeout = TimeSpan.FromSeconds(1);
 
-                this.detectedChipset = this.ChipsetModelMatcher();
-                this.ChipsetModelText.Text = this.detectedChipset ?? "Not Detected";
+                this.detectedChipsetString = this.ChipsetModelMatcher();
+                this.ChipsetModelText.Text = this.detectedChipsetString ?? "Not Detected";
                 this.SetInstalledVersion();
 
-                if (this.detectedChipset != null)
+                if (this.detectedChipsetString != null)
                 {
-                    this.latestVersionUrl = await this.FetchLatestVersionUrl(this.detectedChipset);
-                    this.latestVersion = this.latestVersionUrl?.Split('_').Last().Replace(".exe", string.Empty);
-                    if (this.latestVersion != null)
+                    var versionData = await this.FetchLatestVersionData(this.detectedChipsetString);
+                    this.latestVersionReleasePageUrl = versionData.Item1;
+                    this.latestVersionDownloadFileUrl = versionData.Item2;
+                    this.latestVersionString = versionData.Item3;
+
+                    if (this.latestVersionString != null)
                     {
                         this.InstallDriversButton.IsEnabled = true;
                     }
                 }
 
-                this.LatestVersionText.Text = this.latestVersion ?? "Error fetching";
+                if (this.latestVersionString != null)
+                {
+                    this.LatestVersionText.Text = this.latestVersionString;
+                    this.LatestVersionText.TextDecorations = TextDecorations.Underline;
+                    this.LatestVersionText.Cursor = Cursors.Hand;
+                    this.LatestVersionText.MouseLeftButtonDown += (s, e) =>
+                    {
+                        if (this.latestVersionReleasePageUrl != null)
+                        {
+                            Process.Start(new ProcessStartInfo(this.latestVersionReleasePageUrl) { UseShellExecute = true });
+                        }
+                    };
+                }
+                else
+                {
+                    this.LatestVersionText.Text = "Error fetching";
+                    this.LatestVersionText.TextDecorations = null;
+                    this.LatestVersionText.Cursor = Cursors.Arrow;
+                    this.LatestVersionText.MouseLeftButtonDown -= (s, e) => { };
+                }
             }
 
             _ = InitializeAsync();
@@ -122,11 +147,11 @@ namespace ChipsetAutoUpdater
         }
 
         /// <summary>
-        /// Attempt to fetch the latest release version URL for AMD Chipset Software.
+        /// Attempt to fetch the latest release page and executable download URL, and parse the latest version for AMD Chipset Software.
         /// </summary>
         /// <param name="chipset">Target chipset to check.</param>
         /// <returns>The latest release version or null.</returns>
-        public async Task<string> FetchLatestVersionUrl(string chipset)
+        public async Task<Tuple<string, string, string>> FetchLatestVersionData(string chipset)
         {
             try
             {
@@ -137,11 +162,13 @@ namespace ChipsetAutoUpdater
                 if (driversUrlMatch.Success)
                 {
                     string chipsetPageContent = await this.client.GetStringAsync(driversUrlMatch.Value);
-                    string chipsetUrlPattern = $@"https://[^""]+\.exe";
-                    Match chipsetUrlMatch = Regex.Match(chipsetPageContent, chipsetUrlPattern, RegexOptions.IgnoreCase);
-                    if (chipsetUrlMatch.Success)
+                    string chipsetDownloadFileUrlPattern = $@"https://[^""]+\.exe";
+                    Match chipsetDownloadFileUrlMatch = Regex.Match(chipsetPageContent, chipsetDownloadFileUrlPattern, RegexOptions.IgnoreCase);
+                    string chispetReleasePageUrlPattrern = $@"/en/resources/support-articles/release-notes/.*chipset[^""]+";
+                    Match chipsetRelasePageUrlMatch = Regex.Match(chipsetPageContent, chispetReleasePageUrlPattrern, RegexOptions.IgnoreCase);
+                    if (chipsetDownloadFileUrlMatch.Success && chipsetRelasePageUrlMatch.Success)
                     {
-                        return chipsetUrlMatch.Value;
+                        return Tuple.Create($@"https://www.amd.com{chipsetRelasePageUrlMatch.Value}", chipsetDownloadFileUrlMatch.Value, chipsetDownloadFileUrlMatch.Value.Split('_').Last().Replace(".exe", string.Empty));
                     }
                 }
             }
@@ -149,12 +176,12 @@ namespace ChipsetAutoUpdater
             {
             }
 
-            return null;
+            return Tuple.Create<string, string, string>(null, null, null);
         }
 
         private async void InstallDrivers_Click(object sender, RoutedEventArgs e)
         {
-            string localFilePath = Path.Combine(Path.GetTempPath(), $"amd_chipset_software_{this.latestVersion}.exe");
+            string localFilePath = Path.Combine(Path.GetTempPath(), $"amd_chipset_software_{this.latestVersionString}.exe");
             try
             {
                 this.InstallDriversButton.IsEnabled = false;
@@ -163,7 +190,7 @@ namespace ChipsetAutoUpdater
                 this.CancelButton.Visibility = Visibility.Visible;
                 this.cancellationTokenSource = new CancellationTokenSource();
 
-                await this.DownloadFileAsync(this.latestVersionUrl, localFilePath, this.cancellationTokenSource.Token);
+                await this.DownloadFileAsync(this.latestVersionDownloadFileUrl, localFilePath, this.cancellationTokenSource.Token);
 
                 if (this.cancellationTokenSource.Token.IsCancellationRequested)
                 {
@@ -277,8 +304,8 @@ namespace ChipsetAutoUpdater
 
         private void SetInstalledVersion()
         {
-            this.installedVersion = this.GetInstalledAMDChipsetVersion();
-            this.InstalledVersionText.Text = this.installedVersion ?? "Not Installed";
+            this.installedVersionString = this.GetInstalledAMDChipsetVersion();
+            this.InstalledVersionText.Text = this.installedVersionString ?? "Not Installed";
         }
 
         private void CleanUpFile(string destinationFilePath)
