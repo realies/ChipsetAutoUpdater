@@ -15,22 +15,35 @@ namespace ChipsetAutoUpdater
     using System.Threading;
     using System.Threading.Tasks;
     using System.Windows;
-    using System.Windows.Input;
+    using System.Windows.Forms;
     using Microsoft.Win32;
+    using Microsoft.Win32.TaskScheduler;
+
+    using Application = System.Windows.Application;
+    using Cursors = System.Windows.Input.Cursors;
+    using MessageBox = System.Windows.MessageBox;
+    using SystemTask = System.Threading.Tasks.Task;
+    using TaskSchedulerTask = Microsoft.Win32.TaskScheduler.Task;
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml.
     /// </summary>
     public partial class MainWindow : Window
     {
+        private const string TaskName = "ChipsetAutoUpdaterAutoStart";
+        private const int UpdateCheckIntervalHours = 6;
+
+        private NotifyIcon notifyIcon;
         private string detectedChipsetString;
         private string installedVersionString;
         private string latestVersionReleasePageUrl;
         private string latestVersionDownloadFileUrl;
         private string latestVersionString;
-
         private CancellationTokenSource cancellationTokenSource;
-        private HttpClient client = new HttpClient();
+        private HttpClient client;
+        private bool isInitializing = true;
+        private System.Windows.Threading.DispatcherTimer updateTimer;
+        private bool autoUpdateEnabled = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
@@ -38,63 +51,230 @@ namespace ChipsetAutoUpdater
         public MainWindow()
         {
             this.InitializeComponent();
+            this.InitializeNotifyIcon();
+            this.StateChanged += this.MainWindow_StateChanged;
+            this.Loaded += this.Window_Loaded;
 
-            this.Title = "Chipset Auto Updater " + (Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyFileVersionAttribute), false).OfType<AssemblyFileVersionAttribute>().FirstOrDefault()?.Version?.TrimEnd(".0".ToCharArray()) + " " ?? " ") + "Alpha";
-
-            async Task InitializeAsync()
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Contains("/min"))
             {
-                this.client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; AcmeInc/1.0)");
-                this.client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
-                this.client.DefaultRequestHeaders.Referrer = new Uri("https://www.amd.com/");
-                this.client.Timeout = TimeSpan.FromSeconds(1);
-
-                this.detectedChipsetString = this.ChipsetModelMatcher();
-                this.ChipsetModelText.Text = this.detectedChipsetString ?? "Not Detected";
-                this.SetInstalledVersion();
-
-                if (this.detectedChipsetString != null)
-                {
-                    var versionData = await this.FetchLatestVersionData(this.detectedChipsetString);
-                    this.latestVersionReleasePageUrl = versionData.Item1;
-                    this.latestVersionDownloadFileUrl = versionData.Item2;
-                    this.latestVersionString = versionData.Item3;
-
-                    if (this.latestVersionString != null)
-                    {
-                        this.InstallDriversButton.IsEnabled = true;
-                    }
-                }
-
-                if (this.latestVersionString != null)
-                {
-                    this.LatestVersionText.Text = this.latestVersionString;
-                    this.LatestVersionText.TextDecorations = TextDecorations.Underline;
-                    this.LatestVersionText.Cursor = Cursors.Hand;
-                    this.LatestVersionText.MouseLeftButtonDown += (s, e) =>
-                    {
-                        if (this.latestVersionReleasePageUrl != null)
-                        {
-                            Process.Start(new ProcessStartInfo(this.latestVersionReleasePageUrl) { UseShellExecute = true });
-                        }
-                    };
-                }
-                else
-                {
-                    this.LatestVersionText.Text = "Error fetching";
-                    this.LatestVersionText.TextDecorations = null;
-                    this.LatestVersionText.Cursor = Cursors.Arrow;
-                    this.LatestVersionText.MouseLeftButtonDown -= (s, e) => { };
-                }
+                this.WindowState = WindowState.Minimized;
+                this.Hide();
             }
 
-            _ = InitializeAsync();
+            if (args.Contains("/autoupdate"))
+            {
+                this.autoUpdateEnabled = true;
+            }
+
+            this.Title = "CAU " + (Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyFileVersionAttribute), false).OfType<AssemblyFileVersionAttribute>().FirstOrDefault()?.Version?.TrimEnd(".0".ToCharArray()) + " " ?? " ");
+
+            this.client = new HttpClient();
+            this.client.Timeout = TimeSpan.FromSeconds(1);
+            this.client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; AcmeInc/1.0)");
+            this.client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
+            this.client.DefaultRequestHeaders.Referrer = new Uri("https://www.amd.com/");
+
+            this.InitializeUpdateTimer();
+            _ = this.RenderView();
         }
 
         /// <summary>
-        /// Attempt to match AM4 or AM5 model name via a registry entry.
+        /// Performs cleanup operations when the window is closed.
+        /// Disposes of the notify icon and calls the base OnClosed method.
         /// </summary>
-        /// <returns>A capitalised chipset name or null.</returns>
-        public string ChipsetModelMatcher()
+        /// <param name="e">A System.EventArgs that contains the event data.</param>
+        protected override void OnClosed(EventArgs e)
+        {
+            this.notifyIcon.Dispose();
+            base.OnClosed(e);
+        }
+
+        private void InitializeUpdateTimer()
+        {
+            this.updateTimer = new System.Windows.Threading.DispatcherTimer();
+            this.updateTimer.Tick += async (sender, e) => await this.CheckForUpdates();
+            this.updateTimer.Interval = TimeSpan.FromHours(UpdateCheckIntervalHours);
+            this.updateTimer.Start();
+        }
+
+        private async SystemTask CheckForUpdates()
+        {
+            await this.RenderView();
+            if (this.latestVersionString != null && this.latestVersionString != this.installedVersionString)
+            {
+                this.Show();
+                this.WindowState = WindowState.Normal;
+                this.Activate();
+                if (this.autoUpdateEnabled)
+                {
+                    this.InstallDrivers_Click(this, new RoutedEventArgs());
+                }
+            }
+        }
+
+        private void AutoStartCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (this.isInitializing)
+            {
+                return;
+            }
+
+            if (this.AutoStartCheckBox.IsChecked == true)
+            {
+                this.CreateStartupTask();
+                this.AutoUpdateCheckBox.IsEnabled = true;
+            }
+            else
+            {
+                this.RemoveStartupTask();
+                this.AutoUpdateCheckBox.IsChecked = false;
+                this.AutoUpdateCheckBox.IsEnabled = false;
+                this.autoUpdateEnabled = false;
+            }
+        }
+
+        private void AutoUpdateCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (this.isInitializing)
+            {
+                return;
+            }
+
+            this.autoUpdateEnabled = this.AutoUpdateCheckBox.IsChecked == true;
+            this.CreateStartupTask();
+        }
+
+        private void CreateStartupTask()
+        {
+            using (TaskService ts = new TaskService())
+            {
+                TaskDefinition td = ts.NewTask();
+                td.RegistrationInfo.Description = "Start ChipsetAutoUpdater at system startup";
+
+                td.Triggers.Add(new LogonTrigger());
+
+                string arguments = "/min";
+                if (this.AutoUpdateCheckBox.IsChecked == true)
+                {
+                    arguments += " /autoupdate";
+                }
+
+                td.Actions.Add(new ExecAction(Assembly.GetExecutingAssembly().Location, arguments));
+
+                td.Principal.RunLevel = TaskRunLevel.Highest;
+
+                ts.RootFolder.RegisterTaskDefinition(TaskName, td);
+            }
+        }
+
+        private void RemoveStartupTask()
+        {
+            using (TaskService ts = new TaskService())
+            {
+                ts.RootFolder.DeleteTask(TaskName, false);
+            }
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            using (TaskService ts = new TaskService())
+            {
+                TaskSchedulerTask task = ts.GetTask(TaskName);
+                this.AutoStartCheckBox.IsChecked = task != null;
+                this.AutoUpdateCheckBox.IsChecked = task != null && task.Definition.Actions.OfType<ExecAction>().Any(a => a.Arguments.Contains("/autoupdate"));
+            }
+
+            this.AutoUpdateCheckBox.IsEnabled = this.AutoStartCheckBox.IsChecked == true;
+            this.autoUpdateEnabled = this.AutoUpdateCheckBox.IsChecked == true;
+
+            this.isInitializing = false;
+        }
+
+        private void InitializeNotifyIcon()
+        {
+            this.notifyIcon = new NotifyIcon();
+            this.notifyIcon.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+            this.notifyIcon.Visible = true;
+            this.notifyIcon.Text = "Chipset Auto Updater";
+
+            // Create context menu
+            ContextMenuStrip contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("Open", null, this.OnOpenClick);
+            contextMenu.Items.Add("Exit", null, this.OnExitClick);
+
+            this.notifyIcon.ContextMenuStrip = contextMenu;
+            this.notifyIcon.DoubleClick += this.NotifyIcon_DoubleClick;
+        }
+
+        private async void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (this.WindowState == WindowState.Minimized)
+            {
+                this.Hide();
+            }
+            else if (this.WindowState == WindowState.Normal)
+            {
+                await this.CheckForUpdates();
+            }
+        }
+
+        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = WindowState.Normal;
+        }
+
+        private void OnOpenClick(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = WindowState.Normal;
+        }
+
+        private void OnExitClick(object sender, EventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private async SystemTask RenderView()
+        {
+            this.detectedChipsetString = this.ChipsetModelMatcher();
+            this.ChipsetModelText.Text = this.detectedChipsetString ?? "Not Detected";
+            this.SetInstalledVersion();
+
+            if (this.detectedChipsetString != null)
+            {
+                var versionData = await this.FetchLatestVersionData(this.detectedChipsetString);
+                this.latestVersionReleasePageUrl = versionData.Item1;
+                this.latestVersionDownloadFileUrl = versionData.Item2;
+                this.latestVersionString = versionData.Item3;
+            }
+
+            if (this.latestVersionString != null)
+            {
+                this.LatestVersionText.Text = this.latestVersionString;
+                this.LatestVersionText.TextDecorations = TextDecorations.Underline;
+                this.LatestVersionText.Cursor = Cursors.Hand;
+                this.LatestVersionText.MouseLeftButtonDown += (s, e) =>
+                {
+                    if (this.latestVersionReleasePageUrl != null)
+                    {
+                        Process.Start(new ProcessStartInfo(this.latestVersionReleasePageUrl) { UseShellExecute = true });
+                    }
+                };
+                this.InstallDriversButton.IsEnabled = true;
+            }
+            else
+            {
+                this.LatestVersionText.Text = "Error fetching";
+                this.LatestVersionText.TextDecorations = null;
+                this.LatestVersionText.Cursor = Cursors.Arrow;
+                this.LatestVersionText.MouseLeftButtonDown -= (s, e) => { };
+                this.InstallDriversButton.IsEnabled = false;
+            }
+        }
+
+        private string ChipsetModelMatcher()
         {
             string registryPath = @"HARDWARE\DESCRIPTION\System\BIOS";
             using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registryPath))
@@ -114,11 +294,7 @@ namespace ChipsetAutoUpdater
             return null;
         }
 
-        /// <summary>
-        /// Attempt to read the currently installed AMD Chipset Software version.
-        /// </summary>
-        /// <returns>A currently installed package version or null.</returns>
-        public string GetInstalledAMDChipsetVersion()
+        private string GetInstalledAMDChipsetVersion()
         {
             string registryPath = @"Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
             using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registryPath))
@@ -146,12 +322,7 @@ namespace ChipsetAutoUpdater
             return null;
         }
 
-        /// <summary>
-        /// Attempt to fetch the latest release page and executable download URL, and parse the latest version for AMD Chipset Software.
-        /// </summary>
-        /// <param name="chipset">Target chipset to check.</param>
-        /// <returns>The latest release version or null.</returns>
-        public async Task<Tuple<string, string, string>> FetchLatestVersionData(string chipset)
+        private async Task<Tuple<string, string, string>> FetchLatestVersionData(string chipset)
         {
             try
             {
@@ -208,8 +379,8 @@ namespace ChipsetAutoUpdater
                     CreateNoWindow = true,
                 };
                 Process process = Process.Start(startInfo);
-                await Task.Run(() => this.MonitorProcess(process));
-                await Task.Run(() => process.WaitForExit());
+                await SystemTask.Run(() => this.MonitorProcess(process));
+                await SystemTask.Run(() => process.WaitForExit());
             }
             catch (Exception ex)
             {
@@ -226,7 +397,7 @@ namespace ChipsetAutoUpdater
             }
         }
 
-        private async Task DownloadFileAsync(string requestUri, string destinationFilePath, CancellationToken cancellationToken)
+        private async SystemTask DownloadFileAsync(string requestUri, string destinationFilePath, CancellationToken cancellationToken)
         {
             try
             {
@@ -293,12 +464,12 @@ namespace ChipsetAutoUpdater
             this.cancellationTokenSource?.Cancel();
         }
 
-        private async Task MonitorProcess(Process process)
+        private async SystemTask MonitorProcess(Process process)
         {
             while (!process.HasExited)
             {
                 await this.Dispatcher.InvokeAsync(() => this.SetInstalledVersion());
-                await Task.Delay(1000);
+                await SystemTask.Delay(1000);
             }
         }
 

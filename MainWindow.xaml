@@ -6,10 +6,11 @@
         xmlns:local="clr-namespace:ChipsetAutoUpdater"
         mc:Ignorable="d"
         Title=""
-        Height="146"
-        Width="256"
-        ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen">
+        Height="162"
+        Width="235"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -17,9 +18,11 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="128" />
+            <ColumnDefinition Width="115" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -32,8 +35,23 @@
         <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="Bold">Latest Version:</TextBlock>
         <TextBlock Grid.Row="2" Grid.Column="1" Name="LatestVersionText">Fetching version...</TextBlock>
 
-        <ProgressBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DownloadProgressBar" Height="8" Margin="0 6 0 6" Minimum="0" Maximum="100" Visibility="Visible"/>
-        <Button Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Content="Install Drivers" Click="InstallDrivers_Click" Name="InstallDriversButton" IsEnabled="False"/>
-        <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Content="Cancel Download" Click="CancelDownload_Click" Name="CancelButton" Visibility="Collapsed"/>
+        <CheckBox Grid.Row="4" Grid.Column="0"
+          Name="AutoStartCheckBox"
+          Checked="AutoStartCheckBox_Checked"
+          Unchecked="AutoStartCheckBox_Checked"
+          Margin="0 6 0 0">
+            Start on boot
+        </CheckBox>
+        <CheckBox Grid.Row="4" Grid.Column="1"
+          Name="AutoUpdateCheckBox"
+          Checked="AutoUpdateCheckBox_Checked"
+          Unchecked="AutoUpdateCheckBox_Checked"
+          Margin="0 6 0 0">
+            Auto-update
+        </CheckBox>
+
+        <ProgressBar Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="DownloadProgressBar" Height="8" Margin="0 6 0 6" Minimum="0" Maximum="100" Visibility="Visible"/>
+        <Button Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Content="Install Drivers" Click="InstallDrivers_Click" Name="InstallDriversButton" IsEnabled="False"/>
+        <Button Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Content="Cancel Download" Click="CancelDownload_Click" Name="CancelButton" Visibility="Collapsed"/>
     </Grid>
 </Window>

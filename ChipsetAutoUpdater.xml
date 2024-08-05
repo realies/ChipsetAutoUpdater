@@ -35,24 +35,12 @@
             Initializes a new instance of the <see cref="T:ChipsetAutoUpdater.MainWindow"/> class.
             </summary>
         </member>
-        <member name="M:ChipsetAutoUpdater.MainWindow.ChipsetModelMatcher">
+        <member name="M:ChipsetAutoUpdater.MainWindow.OnClosed(System.EventArgs)">
             <summary>
-            Attempt to match AM4 or AM5 model name via a registry entry.
+            Performs cleanup operations when the window is closed.
+            Disposes of the notify icon and calls the base OnClosed method.
             </summary>
-            <returns>A capitalised chipset name or null.</returns>
-        </member>
-        <member name="M:ChipsetAutoUpdater.MainWindow.GetInstalledAMDChipsetVersion">
-            <summary>
-            Attempt to read the currently installed AMD Chipset Software version.
-            </summary>
-            <returns>A currently installed package version or null.</returns>
-        </member>
-        <member name="M:ChipsetAutoUpdater.MainWindow.FetchLatestVersionData(System.String)">
-            <summary>
-            Attempt to fetch the latest release page and executable download URL, and parse the latest version for AMD Chipset Software.
-            </summary>
-            <param name="chipset">Target chipset to check.</param>
-            <returns>The latest release version or null.</returns>
+            <param name="e">A System.EventArgs that contains the event data.</param>
         </member>
         <member name="M:ChipsetAutoUpdater.MainWindow.InitializeComponent">
             <summary>
